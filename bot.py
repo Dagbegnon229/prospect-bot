@@ -8,6 +8,8 @@ import os
 import logging
 import asyncio
 import json
+import re
+import html as html_lib
 from datetime import datetime
 from threading import Thread
 
@@ -81,6 +83,14 @@ def run_health_server():
     health_app.run(host="0.0.0.0", port=port)
 
 
+def clean_html(text: str) -> str:
+    """Strip HTML tags and decode entities."""
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = html_lib.unescape(text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
 # ---------------------------------------------------------------------------
 # Fetch jobs
 # ---------------------------------------------------------------------------
@@ -106,7 +116,7 @@ async def fetch_remoteok() -> list[dict]:
                     "title": item.get("position", "N/A"),
                     "company": item.get("company", "N/A"),
                     "url": item.get("url", f"https://remoteok.com/remote-jobs/{item.get('id', '')}"),
-                    "description": (item.get("description") or "")[:500],
+                    "description": clean_html((item.get("description") or ""))[:500],
                     "source": "RemoteOK",
                     "date": item.get("date", ""),
                 })
@@ -136,7 +146,7 @@ async def fetch_arbeitnow() -> list[dict]:
                     "title": item.get("title", "N/A"),
                     "company": item.get("company_name", "N/A"),
                     "url": item.get("url", ""),
-                    "description": (item.get("description") or "")[:500],
+                    "description": clean_html((item.get("description") or ""))[:500],
                     "source": "Arbeitnow",
                     "date": item.get("created_at", ""),
                 })
