@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+*.pickle
+.env
+*.env
+venv/
+.venv/
+bot_data.pickle
