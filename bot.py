@@ -57,7 +57,7 @@ Règles :
 - Pas de formules bateau comme "I am writing to express my interest"
 - Va droit au but"""
 
-GROQ_MODEL = "llama-3.1-70b-versatile"
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -116,38 +116,39 @@ async def fetch_remoteok() -> list[dict]:
         return []
 
 
-async def fetch_jobicy() -> list[dict]:
-    """Fetch dev jobs from Jobicy API."""
-    url = "https://jobicy.com/api/v1/remote-jobs?count=20&industry=dev"
+async def fetch_arbeitnow() -> list[dict]:
+    """Fetch dev jobs from Arbeitnow API."""
+    url = "https://www.arbeitnow.com/api/job-board-api"
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.get(url)
             resp.raise_for_status()
             data = resp.json()
         jobs = []
-        for item in data.get("jobs", []):
-            title = (item.get("jobTitle") or "").lower()
-            desc = (item.get("jobDescription") or "").lower()
-            search_text = f"{title} {desc}"
+        for item in data.get("data", []):
+            title = (item.get("title") or "").lower()
+            desc = (item.get("description") or "").lower()
+            tags = " ".join(item.get("tags") or []).lower()
+            search_text = f"{title} {desc} {tags}"
             if any(kw in search_text for kw in KEYWORDS):
                 jobs.append({
-                    "id": f"jbc-{item.get('id', '')}",
-                    "title": item.get("jobTitle", "N/A"),
-                    "company": item.get("companyName", "N/A"),
+                    "id": f"abn-{item.get('slug', '')}",
+                    "title": item.get("title", "N/A"),
+                    "company": item.get("company_name", "N/A"),
                     "url": item.get("url", ""),
-                    "description": (item.get("jobExcerpt") or item.get("jobDescription") or "")[:500],
-                    "source": "Jobicy",
-                    "date": item.get("pubDate", ""),
+                    "description": (item.get("description") or "")[:500],
+                    "source": "Arbeitnow",
+                    "date": item.get("created_at", ""),
                 })
         return jobs
     except Exception as e:
-        logger.error(f"Jobicy error: {e}")
+        logger.error(f"Arbeitnow error: {e}")
         return []
 
 
 async def fetch_jobs() -> list[dict]:
     """Fetch jobs from all sources and deduplicate."""
-    results = await asyncio.gather(fetch_remoteok(), fetch_jobicy())
+    results = await asyncio.gather(fetch_remoteok(), fetch_arbeitnow())
     all_jobs = []
     for job_list in results:
         all_jobs.extend(job_list)
@@ -192,7 +193,9 @@ Rédige un message de candidature court et percutant pour ce poste."""
                 json=payload,
                 headers=headers,
             )
-            resp.raise_for_status()
+            if resp.status_code != 200:
+                logger.error(f"Groq HTTP {resp.status_code}: {resp.text}")
+                return "⚠️ Erreur lors de la génération de la candidature."
             data = resp.json()
         return data["choices"][0]["message"]["content"]
     except Exception as e:
